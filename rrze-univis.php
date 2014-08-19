@@ -2,7 +2,7 @@
 /**
  * Plugin Name: RRZE-UnivIS
  * Description: Einbindung von Daten aus UnivIS für den Geschäftsverteilungsplan auf Basis des UnivIS-Plugins des Webbaukastens.
- * Version: 0.9.8
+ * Version: 0.9.8 developing
  * Author: Karin Kimpan, RRZE-Webteam
  * Author URI: http://blogs.fau.de/webworking/
  * License: GPLv2 or later
@@ -95,11 +95,17 @@ class RRZE_UnivIS {
         add_action('admin_init', array(__CLASS__, 'admin_init'));
         add_action('admin_menu', array(__CLASS__, 'add_options_page'));
         add_shortcode('univis', array(__CLASS__, 'univis'));
+        //für Parameterabfrage
+        add_action('init', array(__CLASS__, 'add_rewrite_endpoint'));
+        add_action('permalink_structure_changed', array(__CLASS__, 'add_rewrite_endpoint'));
     }
 
     public static function activate() {
         self::version_compare();
         update_option(self::version_option_name, self::version);
+        self::add_rewrite_endpoint();
+        //fraglich ob nötig
+        flush_rewrite_rules();
     }
 
     private static function version_compare() {
@@ -204,17 +210,23 @@ class RRZE_UnivIS {
         }
         $shortcode_atts = shortcode_atts($defaults, $atts);
         extract($shortcode_atts);
+
         if ($UnivISOrgNr) {
             // FETCH $_GET OR CRON ARGUMENTS TO AUTOMATE TASKS
             $args = (!empty($_GET)) ? $_GET:array('task'=>$argv[1]);
             $controller = new Controller("mitarbeiter-alle", NULL, $shortcode_atts);
             $ausgabe = $controller->ladeHTML();
-            
+            //_rrze_debug($controller);
 
         } else
             $ausgabe = sprintf('<a href="%1$s">%2$s</a>', $univis_url, $options['univis_default_link']);
-
+        
         return $ausgabe;
+    }
+    
+    public static function add_rewrite_endpoint() {
+        add_rewrite_endpoint('univis', EP_PAGES);
+        add_rewrite_endpoint('search', EP_PAGES);
     }
 
     ///////////////////////////////////////////////////////////////
