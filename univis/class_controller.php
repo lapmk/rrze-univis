@@ -24,13 +24,15 @@ class univisController {
 	 * @param Pfad zu Conf Datei
 	 * @access 	public
 	 */
-	function __construct($task, $args, $confFile=NULL) {
-
-		$this->_ladeConf($confFile, $args);
-
+//	function __construct($task, $args, $confFile=NULL) {
+	function __construct($config) {
+//print_r($config);
+			$this->optionen = $config;
+/*		
+	$this->_ladeConf($confFile, $args);
 		if($task && $this->optionen)
-			$this->optionen["task"] = $task;
-
+		$this->optionen["task"] = $task;
+*/
 	}
 
 	function ladeHTML() {
@@ -39,7 +41,11 @@ class univisController {
 
 		if($datenAusCache != -1) {
 			// Daten wurden aus Cache geladen
-			return $datenAusCache;
+      $search = '/^\<\!\-\- UnivIS-ID\:([0-9]+).*/';
+      preg_match($search, $datenAusCache, $match);
+      echo "<!-- UnivIS-ID:".$univisid."-->\n";
+	    $GLOBALS['LocalUnivisID']=$match[1];
+	    return $datenAusCache;
 		}
 
 		// Lade Daten von Univis
@@ -50,14 +56,24 @@ class univisController {
 		if($daten != -1) {
 			// Passe Datenstruktur fuer Templating an.
 			$render = new univisRender($this->optionen);
-			$daten = $render->bearbeiteDaten($daten);
-
+			$daten= $render->bearbeiteDaten($daten);
+			$daten['Optionen']=$this->optionen;
 			// Lade Zusatzinformationen
-			$assets = new univisAssets($this->optionen);
-			$daten["assets"] = $assets->holeDaten();
+			//$assets = new univisAssets($this->optionen);
+			//$daten["assets"] = $assets->holeDaten();
 
 			// Daten rendern
+	
+			/*print("<pre>");
+				print_r($daten);
+				print("</pre>");
+*/
 			$html = $this->_renderTemplate($daten);
+      
+      if($daten['person']['lehr']==="ja"){
+	    $html= "<!-- UnivIS-ID:".$daten['person']["id"]."-->\n".$html;
+	    $GLOBALS['LocalUnivisID']=$daten['person']["id"];
+      }      
 
 			if($html != -1) {	//Rendern erfolgreich?
 
@@ -73,21 +89,14 @@ class univisController {
 			$datenAusCache = $cache->holeDaten(true);
 
 			if($datenAusCache != -1) {
-				return $datenAusCache;
+			      $search = '/^\<\!\-\- UnivIS-ID\:([0-9]+).*/';
+            preg_match($search, $datenAusCache, $match);
+	          $GLOBALS['LocalUnivisID']=$match[1];
+	          return $datenAusCache;
 			}else{
 				// Konnte keine Daten laden. Alternativausgabe laden
-				if($this->optionen["task"] == "mitarbeiter-einzeln") {
-					// Lade Mitarbeiter Alle
-					echo "<div class=\"hinweis_wichtig\"><h4>Fehler: Konnte Person nicht finden.</h4><p>Bitte wählen sie eine Person aus der Liste.</p></div><br class=\"clear\" />";
-					$this->optionen["task"] = "mitarbeiter-alle";
-					return $this->ladeHTML();
-				}
-				if ($this->optionen["task"] == "lehrveranstaltungen-einzeln") {
-					// Lade Lehrveranstaltungen Alle
-					echo "<div class=\"hinweis_wichtig\"><h4>Fehler: Konnte Lehrveranstaltungen nicht finden.</h4><p>Bitte wählen sie eine Lehrveranstaltung aus der Liste.</p></div><br class=\"clear\" />";
-					$this->optionen["task"] = "lehrveranstaltungen-alle";
-					return $this->ladeHTML();
-				}
+					echo "<div class=\"hinweis_wichtig\"><h4>Fehler im Univis-Plugin!.</h4><p>Es konnten keine Daten geladen werden</p></div><br class=\"clear\" />";
+
 			}
 		}
 	}
@@ -103,7 +112,7 @@ class univisController {
 		return  $m->render($template, $daten);
 	}
 
-
+/*
 	private function _ladeConf($fpath, $args=NULL){
 		$options= array();
                 if(is_array($fpath)) {
@@ -153,12 +162,13 @@ class univisController {
 			$this->optionen = array_merge($this->optionen, $args);
 
 	}
+*/
 
 	function _get_template() {
-		$filename = $this->optionen['task'].".shtml";
+		$filename = $this->optionen['task'].".txt";
                 //geändert!
                 //$filename = "templates/".$filename;
-                $filename = plugins_url( "templates/".$filename, __FILE__);
+                $filename = plugins_url( "../templates/".$filename, __FILE__);
 		$handle = fopen($filename, "r");
                 //geändert!
                 //$contents = fread($handle, filesize($filename));

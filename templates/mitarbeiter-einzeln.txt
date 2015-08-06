@@ -1,0 +1,58 @@
+{{#person}}
+<div id="univis-personenseite">
+	<!-- Zusatzinformationen aus Dateiverzeichnis -->
+
+	<div class="vcard">
+    	<h2 class="fn">
+    		{{#title}}
+            <span class="honorific-prefix">{{title}}</span>
+            {{/title}}
+            <span class="given-name">{{firstname}}</span> <span class="family-name">{{lastname}}</span>
+						{{#atitle}}
+            <span class="honorific-suffix">({{atitle }})</span>
+            {{/atitle}}
+        </h2>
+		{{#pictureurl}}
+			<img class="bildlinks" src="{{pictureurl}}">
+		{{/pictureurl}}
+
+		    {{#locations}}
+		<address>
+			<div class="kontakt">
+				<h3>[:de]Kontakt[:en]Contact[:]</h3>
+
+				{{#location}}
+			    <ul class="kontakt">
+			    	 	{{#email}}
+	                <li>[:de]E-Mail[:en]Mail[:]: <a class="email" href="mailto:{{email}}">{{email}}</a></li>
+	                {{/email}}
+	                {{^email}}<li>&nbsp;</li>{{/email}}
+	                {{#tel}}
+	                <li>[:de]Telefon[:en]Phone[:]: <span class="tel">{{tel}}</span></li>
+	                {{/tel}}
+	                {{#fax}}
+	                <li>Fax: <span class="fax">{{fax}}</span></li>
+	                {{/fax}}
+	                {{#office}}
+	                <li>[:de]Raum[:en]Room[:]: <span class="office">{{office}}</span></li>
+	                {{/office}}
+
+			     <span class="adr">
+				    	{{#street}}
+				        <span class="street-address">{{street}}</span><br>
+				        {{/street}}
+				        {{#ort}}
+				        <span class="locality">{{ort}}</span>
+				        {{/ort}}
+				    </span>
+				</ul>
+			    {{/location}}
+			</div>
+		    </address>
+			{{/locations}}
+	</div>
+
+<div style="clear:both"></div>
+
+</div>
+{{/person}}

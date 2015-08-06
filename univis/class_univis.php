@@ -67,7 +67,9 @@ class UNIVIS {
 				case "mitarbeiter-einzeln":
 					$this->daten = $this->_ladeMitarbeiterEinzeln();
 					break;
-
+				case "mitarbeiter-lehre":
+					$this->daten = $this->_ladeMitarbeiterLehre();
+					break;
 				case "publikationen":
 					$this->daten = $this->_ladePublikationen();
 					break;
@@ -97,6 +99,7 @@ class UNIVIS {
 		// Hole Daten von Univis
 		$url = $this->univis_url."?search=departments&number=".$this->optionen["UnivISOrgNr"]."&show=xml";
 
+	echo "\n<!-- UnivIS-Url: ".$url."-->\n";
 		if(!fopen($url, "r")) {
 			// Univis Server ist nicht erreichbar
 			return -1;
@@ -229,9 +232,9 @@ class UNIVIS {
 		// Hole Daten von Univis
 		$url = $this->univis_url."?search=persons&department=".$this->optionen["UnivISOrgNr"]."&name=".$this->optionen["lastname"]."&firstname=".$this->optionen["firstname"]."&show=xml";
 
+
 		$url = $this->umlaute_ersetzen($url);
-
-
+	echo "\n<!-- UnivIS-Url: ".$url."-->\n";
 
 		if(!fopen($url, "r")) {
 			// Univis Server ist nicht erreichbar
@@ -260,11 +263,78 @@ class UNIVIS {
 		}
 
 		if ($this->optionen["Personenanzeige_Lehrveranstaltungen"]) {
+//Erst aktuelles Semester, dann folgendes:
+  $this->optionen['semester']=$this->aktuellesSemester();
 			$person["lehrveranstaltungen"] = $this->_ladeLehrveranstaltungenAlle($person["id"]);
+			$person["lehrveranstaltungen_semester"]= $this->optionen['semester'];
+  $this->optionen['semester']=$this->nextSemester();
+	    $person["lehrveranstaltungen_next"] = $this->_ladeLehrveranstaltungenAlle($person["id"]);
+			$person["lehrveranstaltungen_next_semester"]= $this->optionen['semester'];
+
 		}
 
 		return $person;
-                }
+       }
+	}
+private function _ladeMitarbeiterLehre() {
+
+if(!($this->optionen['univis_id']))
+	{
+		//Ueberpruefe ob Vor- und Nachname gegeben sind.
+		$noetige_felder = array("firstname", "lastname");
+		foreach ($noetige_felder as $feld) {
+			if(!array_key_exists($feld, $this->optionen) || $this->optionen[$feld] == "") {
+				// Fehler: Bitte geben Sie Vor- und Nachname der gesuchten Person an
+				//echo "<div class=\"hinweis_wichtig\">Bitte geben Sie Vor- und Nachname der gesuchten Person an.</div>";
+				return -1;
+			}
+
+			if(strrpos($this->optionen[$feld], "&") !== false) {
+				echo "Ung&uuml;ltige Eingabe.";
+				return -1;
+			}
+		}
+
+		// Hole Daten von Univis
+		$url = $this->univis_url."?search=persons&department=".$this->optionen["UnivISOrgNr"]."&name=".$this->optionen["lastname"]."&firstname=".$this->optionen["firstname"]."&show=xml";
+
+
+		$url = $this->umlaute_ersetzen($url);
+	echo "\n<!-- UnivIS-Url: ".$url."-->\n";
+
+		if(!fopen($url, "r")) {
+			// Univis Server ist nicht erreichbar
+			return -1;
+		}
+
+		$persArray = $this->xml2array($url);
+                if(empty($persArray)) {
+                    echo "Leider konnte die Person nicht gefunden werden.";
+                    return -1;
+                } else {
+		$person = $persArray["Person"];
+
+		if(count($persArray) == 0 ) {
+
+			// Keine Person gefunden
+			return -1;
+		}
+
+		// Falls mehrer Personen gefunden wurden, wähle die erste
+		if($person) $person = $person[0];
+$this->optionen['univis_id']=$person["id"];
+	}
+}
+//Erst aktuelles Semester, dann folgendes:
+$this->optionen['semester']=$this->aktuellesSemester();
+			$person["lehrveranstaltungen"] = $this->_ladeLehrveranstaltungenAlle($this->optionen['univis_id']);
+			$person["lehrveranstaltungen_semester"]= $this->optionen['semester'];
+$this->optionen['semester']=$this->nextSemester();
+	$person["lehrveranstaltungen_next"] = $this->_ladeLehrveranstaltungenAlle($this->optionen['univis_id']);
+			$person["lehrveranstaltungen_next_semester"]= $this->optionen['semester'];
+$person['@attributes']['key']=$this->optionen['personkey'];
+		return $person;
+      
 	}
 
 	private function _ladePublikationen($authorid = NULL) {
@@ -275,7 +345,7 @@ class UNIVIS {
 			// Suche nur Publikationen von einen bestimmten Autoren
 			$url .= "&authorid=".$authorid;
 		}
-
+	echo "\n<!-- UnivIS-Url: ".$url."-->\n";
 		if(!fopen($url, "r")) {
 			// Univis Server ist nicht erreichbar
 			return -1;
@@ -310,13 +380,12 @@ class UNIVIS {
 
 	private function _ladeLehrveranstaltungenAlle($dozentid = NULL) {
 		// Hole Daten von Univis
+		$url = "http://univis.uni-erlangen.de/prg?search=lectures&department=".$this->optionen["UnivISOrgNr"]."&show=xml&sem=".$this->optionen["semester"];//$this->aktuellesSemester();
 
-		//&sem=2012w
-		$url = "http://univis.uni-erlangen.de/prg?search=lectures&department=".$this->optionen["UnivISOrgNr"]."&show=xml&sem=".$this->aktuellesSemester();
 		if($dozentid) {
 			$url .= "&lecturerid=".$dozentid;
 		}
-
+	echo "\n<!-- UnivIS-Url: ".$url."-->\n";
 		if(!fopen($url, "r")) {
 			// Univis Server ist nicht erreichbar
 			return -1;
@@ -325,18 +394,21 @@ class UNIVIS {
 
 		$array = $this->xml2array($url);
                 if(empty($array)) {
-                    echo "Leider konnte die Organisationseinheit nicht gefunden werden.";
+                    //echo "Leider konnte die Organisationseinheit nicht gefunden werden.";
                     return -1;
                 } else {
 		$veranstaltungen = $array["Lecture"];
+	//$this->optionen['personkey']=$array["Person"][0]['@attributes']['key'];
+
 
 		$univis_refs = $this->_get_univis_ref($array);
-
+		echo $array["veranstaltung"][0]['@attributes']['key'];
+//print("<pre>");print_r($univis_refs);print("</pre>");
 
 		//Personen informationen einfügen
 		$this->univis_refs_ersetzen($univis_refs, $veranstaltungen);
-
-		return $veranstaltungen;
+//print("<pre>");print_r($veranstaltungen);print("</pre>");
+	return $veranstaltungen;
                 }
 
 	}
@@ -356,10 +428,11 @@ class UNIVIS {
 
 		$url = "http://univis.uni-erlangen.de/prg?search=lectures&show=xml&sem=".$this->aktuellesSemester();
 
+
 		if($this->optionen["id"]) {
 			$url .= "&id=".$this->toNumber($this->optionen["id"]);
 		}
-
+	echo "\n<!-- UnivIS-Url: ".$url."-->\n";
 		if(!fopen($url, "r")) {
 			// Univis Server ist nicht erreichbar
 			return -1;
@@ -422,37 +495,49 @@ class UNIVIS {
 	}
 
 	private function umlaute_ersetzen($text){
-		$such_array  = array ('ä', 'ö', 'ü', 'ß');
-		$ersetzen_array = array ('ae', 'oe', 'ue', 'ss');
+		$such_array  = array ('ä', 'ö', 'ü', 'ß',' ');
+		$ersetzen_array = array ('ae', 'oe', 'ue', 'ss', '%20');
 		$neuer_text  = str_replace($such_array, $ersetzen_array, $text);
 		return $neuer_text;
 	}
 
 	// Ersetzt die Referenzen von Univis durch den jeweilig dazugehoerigen Datensatz.
-	private function univis_refs_ersetzen($refs, $arr) {
-		$search_results = array();
+	private function univis_refs_ersetzen($refs, &$arr) {
 		$search_key = "UnivISRef";
-
 		foreach ($arr as &$child) {
-			if(array_key_exists($search_key, $child)) {
-				$child = $refs[$child[$search_key][0]["key"]];
-			}
+			if(is_array($child) && array_key_exists($search_key, $child)) {
+        $type=$child['UnivISRef'][0]['type'];
+				$child = $refs[$child[$search_key][0]['key']];
 
+				if($type==='Person'){//name gefunden
+					if(isset($child['locations'])&&isset($child['locations'][0]['location'][0]['email']))
+					{$user= get_user_by('email',$child['locations'][0]['location'][0]['email']);}
+					else{$user=false;}
+		      if($user){$child['wp_authorurl']=get_author_posts_url($user->ID);}
+		      }
+		  //  if($type==='Lecture'){//Course/lecture gefunden
+		  //  echo $child['name']."<br>";
+    // echo "<pre>";		    print_r($child['terms']);echo "</pre>";
+		    //}
+		     
+			}
+//Maybe here an elseif?
 			if(is_array($child)) {
 				$this->univis_refs_ersetzen($refs, $child);
 			}
 		}
-		return $search_results;
 	}
 
 	private function _get_univis_ref($arr) {
 		$univis_refs = array();
-
 		$dict = array("Room", "Person", "Title", "Lecture");
 		foreach ($dict as $type) {
+		  if(isset($arr[$type]))
+		  {
 			$univis_refs = array_merge($univis_refs, $arr[$type]);
+			}
 		}
-
+	
 		$refs = array();
 		foreach ($univis_refs as $ref) {
 			if($ref["@attributes"]["key"]) {
@@ -487,6 +572,33 @@ class UNIVIS {
 		if($heute[1] < $fruehling[1]) $jahr--;
 		return $jahr . "w";
 	}
+	private function nextSemester() {
+			$aktuell = $this->aktuellesSemester();
+			$aktuelljahr= substr($aktuell,0,4);
+			$aktuellterm= substr($aktuell,4);
+
+			if($aktuellterm=='w')
+			{
+				$nextyear=intval($aktuelljahr)+1;
+				return $nextyear."s";
+			}else{
+				return $aktuelljahr."w";
+			}
+	}
+	private function lastSemester() {
+			$aktuell = $this->aktuellesSemester();
+			$aktuelljahr= substr($aktuell,0,4);
+			$aktuellterm= substr($aktuell,4);
+
+			if($aktuellterm=='w')
+			{
+				return $aktuelljahr."s";
+			}else{
+				$lastyear=intval($aktuelljahr)+1;		
+				return $lastyear."w";
+			}
+	}
+
 
 	private function toNumber($data) {
 		return (int)$data;

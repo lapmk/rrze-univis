@@ -1,0 +1,78 @@
+<div id="staffgroup">
+
+	{{#gruppen}}
+        <h4>{{ name }}</h4>
+<table>
+  <colgroup>
+   <col width="50px">
+    <col>
+    <col width="30%">
+    <col width="15%">
+  </colgroup>
+        {{#personen}}	    
+<tr>
+<td>{{#pictureurl}}<img src="{{pictureurl}}">{{/pictureurl}}{{^pictureurl}}<div class="no_image"></div>{{/pictureurl}}</td>
+<td>
+{{#leaderfunction}}<b>{{leaderfunction}}</b><br/>{{/leaderfunction}} 
+{{#wp_authorurl}}<a href={{wp_authorurl}}>{{/wp_authorurl}}
+{{#title}}{{title}}&nbsp;{{/title}}{{firstname}} {{lastname}}{{#atitle}}, {{atitle}}{{/atitle}}{{#wp_authorurl}}</a>{{/wp_authorurl}}
+{{#specialfunction}}<br/>({{specialfunction}}){{/specialfunction}} 
+</td>
+<td><ul>
+		{{#locations}}
+			{{#location}}
+				{{#email}}
+<li>
+<a href="mailto:{{ email }}">{{ email }}</a>
+</li>		
+		{{/email}}
+{{/location}}
+</ul></td>
+{{/locations}}
+<td>
+{{#locations}}
+<ul>
+{{#location}}
+{{#tel}}
+<li>{{tel}}</li>{{/tel}}
+{{/location}}
+</ul>
+{{/locations}}
+
+<!-- <td>{{{text}}}</td> -->
+        {{/personen}} 
+
+
+  </td>
+ </table>
+	{{/gruppen}}
+<!-- Für restliche Gruppen nur kurze info ausgeben.........................
+##########################################################################
+################################################################## -->
+	{{#OnlyShortInfo}}
+<div class="OnlyShortInfo">
+        {{#name}}
+        <h4>{{ name }}</h4>
+        {{#personen}}
+{{#lastname}}	    
+<div style=" width:280px;float:left;padding-bottom:5px">
+{{#mitarbeiterURL}}<a href={{mitarbeiterURL}}>{{#title}}{{title}} {{/title}}{{ firstname }} {{ lastname }}</a>{{/mitarbeiterURL}}
+{{^mitarbeiterURL}}
+	{{#locations}}
+	{{#location}}
+					{{#email}}<a href="mailto:{{ email }}">{{#title}}{{title}} {{/title}}{{ firstname }} {{ lastname }}</a>{{/email}}
+					{{^email}}{{#title}}{{title}} {{/title}}{{ firstname }} {{ lastname }}{{/email}}
+	{{/location}}
+	{{/locations}}
+	{{^locations}}
+		{{#title}}{{title}} {{/title}}{{ firstname }} {{ lastname }}
+	{{/locations}}
+{{/mitarbeiterURL}}
+</div>
+{{/lastname}}	  
+{{/personen}}
+{{/name}}
+<div style="clear:both;"></div>
+</div>
+	{{/OnlyShortInfo}}
+</div>

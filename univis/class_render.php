@@ -42,6 +42,9 @@ class univisRender {
 				case "mitarbeiter-einzeln":
 					return $this->_bearbeiteMitarbeiterEinzeln($daten);
 
+				case "mitarbeiter-lehre":
+					return $this->_bearbeiteMitarbeiterLehre($daten);
+
 				case "publikationen":
 					return $this->_bearbeitePublikationen($daten);
 
@@ -55,7 +58,7 @@ class univisRender {
 					return $this->_bearbeiteLehrveranstaltungenKalender($daten);
 
 				default:
-					echo "Fehler: Unbekannter Befehl\n";
+					echo "Fehler: Unbekannter Befehl beim Bearbeiten der Daten\n";
 					return -1;
 			}
 		}
@@ -69,10 +72,10 @@ class univisRender {
 		//	Array: ["ORGNAME"] => Array: PERSON-ARRAY
 		////////////////
 
-
 		// Standard Aufteilung: orgname
                 $personen = $daten['Person'];
                 $jobnamen = $daten['jobs'];
+//print_r($personen[0]);
                 $such_kategorie = "orgname";
 		if($this->optionen["Sortiere_Jobs"]) {
 			// Bei Lehrstuehlen ist es aber sinnvoller nach Jobs bzw. Rang zu gliedern.
@@ -80,6 +83,7 @@ class univisRender {
                         $jobs = $daten['Org'][0]['jobs'][0]['job'];
 		}
 		$gruppen = array();
+		$OnlyShortInfo = array();
 		$gruppen_dict = array();
                 $gruppen_personen = array();
                 $gruppen_text = array();
@@ -87,15 +91,19 @@ class univisRender {
                         //Text-Felder müssen auch angezeigt werden, deshalb rausgenommen
 			//if(empty($person["firstname"]))
 			//	continue;
-                        
+      
                                                 
 			if(empty($person[$such_kategorie])) {
 				continue;
 			}
+
                         if(isset($person["title"])) {
                             $person["title-long"] = $this->_str_replace_dict(univisDicts::$acronyms, $person["title"]);
                         }
 			
+
+
+
                         if(isset($person["firstname"])&&isset($person["lastname"])) {
                             $name = $person["firstname"]."-".$person["lastname"];
                             //$name = $person["@attributes"]["key"];
@@ -108,6 +116,7 @@ class univisRender {
                             $person["nameurl"] = strtolower($this->umlaute_ersetzen($name));
                             //$person["nameurl"] = str_replace("-", "_", $person["nameurl"]);
                             $person["nameurl"] = str_replace(" ", "-", $person["nameurl"]);
+
                         }
                         
                         if(isset($person['text'])) {
@@ -157,10 +166,125 @@ class univisRender {
                              $person['text'] = str_replace(PHP_EOL, '<br>', $person['text']);
                              $person['text'] = str_replace("<br>\r<br>", '<br>', $person['text']);
                         }
+
+
+
+$person=$this->person_format_convert($person);
+
+
+
+$person['overwriteorder']=0;
+$person_specialfunctions=array();
+$jobs_of_person=  explode("|", $person['rang']);
+$jobs_of_person_priority=array();
+//schluessel sortieren
+foreach($jobs_of_person as $key => $rang)
+{
+$pos=stripos($this->optionen["Function_Jobs"],$rang);
+if($pos===FALSE)
+{
+$jobs_of_person_priority[]=1000;
+}else{
+$jobs_of_person_priority[]=$pos;
+}
+}
+array_multisort($jobs_of_person_priority, SORT_DESC, $jobs_of_person);
+//unwichtigstes funktion jetzt als erstes, wichtigste bleibt somit im zweifel als gruppe übrig.
+
+
+foreach($jobs_of_person as $key => $rang)
+{
+
+//Test ob Leitungsposition
+	if(stripos($this->optionen["Leader_Jobs"],$rang)!==FALSE)
+	{//String enthalten in Leader_jobs-->Overwrite order setzen
+		$person['overwriteorder']=$person['overwriteorder']+1;
+//Internationalization
+	switch($rang){
+		case "Leitung":
+					$person['leaderfunction']="[:de]Leitung[:en]Chair of Institute[:]";break;
+		case "Gruppenleiter":
+					$person['leaderfunction']="[:de]Gruppenleiter[:en]Head of team[:]";break;
+	  case "Vorzimmer":
+					$person['leaderfunction']="[:de]Vorzimmer[:en]Secretary[:]";break;
+		default:
+					$person['leaderfunction']=$rang;
+	}
+	unset($jobs_of_person[$key]);
+
+	}
+	else
+	{
+	//Keine Leitungsposition
+	}
+//Test auf SpecialFunktion
+	if((stripos($this->optionen["Function_Jobs"],$rang)!==FALSE) and (count($jobs_of_person)>1) )
+	{//String enthalten 
+//echo "<br>loesche ".$rang." von".$person['lastname'];
+		$person_specialfunctions[]=$rang;
+	unset($jobs_of_person[$key]);
+	}
+	else
+	{
+	//Keine SpecialFunktion
+	}
+
+}
+
+if(!empty($person_specialfunctions)){
+foreach($person_specialfunctions as $key=>$value){
+	switch($value){
+		case "UnivIS-Beauftragte":
+				if($person['gender']==="m")
+						 $person_specialfunctions[$key]="[:de]UnivIS-Beauftragter[:en]UnivIS editor[:]";
+				else $person_specialfunctions[$key]="[:de]UnivIS-Beauftragte[:en]UnivIS editor[:]";
+			break;
+		case "Sicherheitsbeauftragter (nach SGB VII)":
+				if($person['gender']==="m")
+						 $person_specialfunctions[$key]="[:de]Sicherheitsbeauftragter[:en]Safety advisor[:]";
+				else $person_specialfunctions[$key]="[:de]Sicherheitsbeauftragte[:en]Safety advisor[:]";
+			break;
+		case "Ehemalige/r Mitarbeiter/-in":
+				if($person['gender']==="m")
+						 $person_specialfunctions[$key]="[:de]Ehemaliger[:en]Former staff[:]";
+				else $person_specialfunctions[$key]="[:de]Ehemalige[:en]Former staff[:]";
+			break;
+		case "Gastwissenschaftler/-in":
+				if($person['gender']==="m")
+						 $person_specialfunctions[$key]="[:de]Gastwissenschaftler[:en]Guest scientist[:]";
+				else $person_specialfunctions[$key]="[:de]Gastwissenschaftlerin[:en]Guest scientist[:]";
+			break;
+		case "IT-Betreuer":
+				if($person['gender']==="m")
+						 $person_specialfunctions[$key]="[:de]IT-Betreuer[:en]Admin[:]";
+				else $person_specialfunctions[$key]="[:de]IT-Betreuerin[:en]Admin[:]";
+			break;
+		case "IT-Sicherheits-Beauftragter":
+				if($person['gender']==="m")
+						 $person_specialfunctions[$key]="[:de]IT-Sicherheits-Beauftragter[:en]IT safety advisor[:]";
+				else $person_specialfunctions[$key]="[:de]IT-Sicherheits-Beauftragte[:en]IT safety advisor[:]";
+			break;
+
+	}
+}
+}
+
+$person['specialfunction']=implode(", ", $person_specialfunctions);
+$person['rang']= implode("|", $jobs_of_person);
+
+
+
 			$gruppen_namen = explode("|", $person[$such_kategorie]);
-                                
+
+
 			foreach ($gruppen_namen as $gruppen_name) {
-                            if(empty($gruppen_dict[$gruppen_name])) {
+//Schleife über alle gruppen, in denen die person enthalten ist.
+
+
+
+
+         if(empty($gruppen_dict[$gruppen_name])) 
+				{
 					$gruppen_dict[$gruppen_name] = array();
 				}
 
@@ -181,25 +305,32 @@ class univisRender {
                             // Suche nach eingetragen Mailadressen bzw. URLs
                             //$suchstring = '/\[(.+?)\](\S+)/';
                             // Umsetzung in HTML-Link
-                            //$html = "<a href='$2'>$1</a>";
+                            $html = "<a href='$2'>$1</a>";
                         
                             //$gruppen_text[$gruppen_name][0]['text'] = preg_replace($suchstring, $html, $gruppen_text[$gruppen_name][0]['text']);
                             }                                 
-		}
-
+		}//ende Schleife über personen
                     foreach ($jobnamen as $gruppen_name) {
+
+                   if(isset($gruppen_dict[$gruppen_name]))
                             $gruppen_personen = $gruppen_dict[$gruppen_name];
-                                                                                    
+                            else
+                            $gruppen_personen = null;
+                                                                 
                             if(isset($gruppen_personen[0]['lastname'])){
-                                $gruppen_personen = $this->array_orderby($gruppen_personen, "lastname", SORT_ASC, "firstname", SORT_ASC);
+                                $gruppen_personen = $this->array_orderby($gruppen_personen,"overwriteorder", SORT_DESC,"lastname", SORT_ASC, "firstname", SORT_ASC);
                             }
+													
                             $gruppen_obj = array(
                                     "name" => $gruppen_name,
                                     //"personen" => $this->record_sort($gruppen_personen, "lastname")
                                     "personen" => $gruppen_personen
                             );
-         
-                            array_push($gruppen, $gruppen_obj);
+         						if(count($gruppen_personen)>0)
+														{//ignore empty groups
+																array_push($gruppen, $gruppen_obj);
+													
+														}
                     }                  
                 
                 //Sortierung der Ergebnisse nach dem Funktionsfeld
@@ -246,7 +377,49 @@ class univisRender {
 			}                        
                 }
 
-		return array("gruppen" => $gruppen, "optionen" => $this->optionen);
+//Localisation
+foreach($gruppen as $key =>&$group)
+{
+
+$gruppen[$key]['name']=str_replace("Gruppe","[:de]Gruppe[:en]Team[:]",$group['name']);
+
+switch ($group['name']) {
+    case "Professoren/-innen":
+     $gruppen[$key]['name']="[:de]Lehrstuhlleitung[:en]Institutional administration[:]";
+			break;
+    case "Sekretariat":
+     $gruppen[$key]['name']="[:de]Sekretariat[:en]Secretariat[:]";
+			break;    
+		case "Projektkoordination":
+     $gruppen[$key]['name']="[:de]Projektkoordination[:en]Project administration[:]";
+        break;
+    case "Lehrbeauftragte":
+     $gruppen[$key]['name']="[:de]Lehrbeauftragte[:en]Guest lecturer[:]";
+        break;
+		case "Gastwissenschaftler/-in":
+     $gruppen[$key]['name']="[:de]Gastwissenschaftler[:en]Guest scientists[:]";
+        break;
+		case "Ehemalige Gastwissenschaftler":
+     $gruppen[$key]['name']="[:de]Ehemalige Gastwissenschaftler[:en]Former guest scientist[:]";
+		//Show only short info, move to other array:
+			array_push($OnlyShortInfo, $group);
+			unset($gruppen[$key]);
+        break;
+		case "Ehemalige/r Mitarbeiter/-in":
+     $gruppen[$key]['name']="[:de]Ehemalige[:en]Former staff[:]";
+		//Show only short info, move to other array:
+			array_push($OnlyShortInfo, $group);
+			unset($gruppen[$key]);
+        break;
+}
+}
+
+
+
+
+
+
+		return array("gruppen" => $gruppen, "optionen" => $this->optionen,"OnlyShortInfo" =>$OnlyShortInfo);
 	}
 
 	private function _bearbeiteMitarbeiterOrga($personen) {
@@ -254,7 +427,6 @@ class univisRender {
 		////////////////
 		//	Array: ["ORGNAME"] => Array: PERSON-ARRAY
 		////////////////
-
 
 		$such_kategorie = "orgname";
 		$gruppen = array();
@@ -330,7 +502,6 @@ class univisRender {
 	}
 
 
-
 	private function _bearbeiteMitarbeiterEinzeln($person) {
 		if(!empty($person)) {
 			$person["title-long"] = $this->_str_replace_dict(univisDicts::$acronyms, $person["title"]);
@@ -338,22 +509,63 @@ class univisRender {
 			$person["nameurl"] = strtolower($this->umlaute_ersetzen($name));
 			$person["nameurl"] = str_replace(" ", "%20", $person["nameurl"]);
 
+
+			if(isset($person["publikationen"]))
+			{
 			// Lade Publikationen
 			$publikationen = $this->_bearbeitePublikationen($person["publikationen"]);
+			 $person["publikationen"] = $publikationen;
+			}
+			else
+			{ unset($person["publikationen"]);}
 
-			if($publikationen) $person["publikationen"] = $publikationen;
-			else unset($person["publikationen"]);
+			if ($this->optionen["Personenanzeige_Lehrveranstaltungen"]) {
+				// Lade Lehrveranstaltungen
+				$lehrveranstaltungen = $this->_bearbeiteLehrveranstaltungenAlle($person["lehrveranstaltungen"],$person['@attributes']['key']);
+				$lehrveranstaltungen_next = $this->_bearbeiteLehrveranstaltungenAlle($person["lehrveranstaltungen_next"],$person['@attributes']['key']);
 
+				if($lehrveranstaltungen)$person["lehrveranstaltungen"] = $lehrveranstaltungen;
+				else unset($person["lehrveranstaltungen"]);
+				if($lehrveranstaltungen_next )$person["lehrveranstaltungen_next"] = $lehrveranstaltungen_next ;
+				else unset($person["lehrveranstaltungen_next"]);
+			}
+		 
+      
+			$person=$this->person_format_convert($person);
 
-			// Lade Lehrveranstaltungen
-			$lehrveranstaltungen = $this->_bearbeiteLehrveranstaltungenAlle($person["lehrveranstaltungen"]);
-
-			if($lehrveranstaltungen) $person["lehrveranstaltungen"] = $lehrveranstaltungen;
-			else unset($person["lehrveranstaltungen"]);
-
-			return array("person" => $person, "optionen" =>$this->optionen);
+			return array("person" =>$person);
 		}
 	}
+
+	private function _bearbeiteMitarbeiterLehre($person) {
+		if(!empty($person)) {
+			// Lade Lehrveranstaltungen
+
+			$lehrveranstaltungen = $this->_bearbeiteLehrveranstaltungenAlle($person["lehrveranstaltungen"],$this->optionen['univis_id']);
+
+			$lehrveranstaltungen_next = $this->_bearbeiteLehrveranstaltungenAlle($person["lehrveranstaltungen_next"],$this->optionen['univis_id']);
+
+			if($lehrveranstaltungen)$person["lehrveranstaltungen"] = $lehrveranstaltungen;
+			else unset($person["lehrveranstaltungen"]);
+			
+			if($lehrveranstaltungen_next )$person["lehrveranstaltungen_next"] = $lehrveranstaltungen_next ;
+			else unset($person["lehrveranstaltungen_next"]);
+
+		//Lokalisierung
+		if ($person['lehrveranstaltungen_semester']{4}==='s')
+		{$person["lehrveranstaltungen_semester_human"]="[:de]Sommersemester[:en]Summer term[:] ".substr($person['lehrveranstaltungen_semester'],0,-1);
+		}else{
+		$person["lehrveranstaltungen_semester_human"]="[:de]Wintersemester[:en]Winter term[:] ".substr($person['lehrveranstaltungen_semester'],0,-1);
+		}
+		if ($person['lehrveranstaltungen_next_semester']{4}==='s')
+		{$person["lehrveranstaltungen_next_semester_human"]="[:de]Sommersemester[:en]Summer term[:] ".substr($person['lehrveranstaltungen_next_semester'],0,-1);
+		}else{
+		$person["lehrveranstaltungen_next_semester_human"]="[:de]Wintersemester[:en]Winter term[:] ".substr($person['lehrveranstaltungen_next_semester'],0,-1);
+		}
+			return $person;
+		}
+	}
+
 
 	private function _bearbeitePublikationen($publications) {
 		if(!$publications) return NULL;
@@ -372,6 +584,7 @@ class univisRender {
 
 			for ($k=0; $k < count($year["data"]); $k++) {
 				$publication = $year["data"][$k];
+
 
 				for ($m=0; $m < count($publication["authors"]); $m++) {
 					$author = $publication["authors"][$m]["author"];
@@ -399,21 +612,75 @@ class univisRender {
 		return array( "years" => $publications, "optionen" => $this->optionen);
 	}
 
-	private function _bearbeiteLehrveranstaltungenAlle($veranstaltungen) {
-		if(!$veranstaltungen) return NULL;
+	private function _bearbeiteLehrveranstaltungenAlle($veranstaltungen,$person_id=NULL) {
 
-		$this->_rename_key("type", $veranstaltungen, univisDicts::$lecturetypen);
 
-		for ($i=0; $i < count($veranstaltungen); $i++) {
-			// Einzelne Veranstaltung bearbeiten
-			$veranstaltung_edit = $this->_bearbeiteLehrveranstaltungenEinzeln($veranstaltungen[$i]);
-			$veranstaltungen[$i] = $veranstaltung_edit["veranstaltung"];
+		if(!is_array($veranstaltungen)){return NULL;}
+
+//		$this->_rename_key("type", $veranstaltungen, univisDicts::$lecturetypen);//use always short
+		$this->_rename_key("type", $veranstaltungen, univisDicts::$lecturetypen_short);
+
+			$DelCoursesOfLectures= array();
+	//echo "<br>".$person_id."<br>";
+	
+//Lecture.tech.IE.LETE.arb
+
+	foreach($veranstaltungen as $k =>$veranstaltung){//Loeschliste anlegen und Fremdveranstaltungen loeschen
+//	echo $veranstaltung['name'].":<br>";
+//echo "<pre>";print_r($veranstaltung);echo "</pre>";
+	//Alle Dozenten Dieser Veranstaltung auslesen:
+	foreach($veranstaltung['dozs'][0]['doz'] as $i =>$dozent){
+  if(is_numeric($dozent['id'])){$Dozenten_IDs[$veranstaltung['@attributes']['key']][]=$dozent['id'];}
+		//$user= get_user_by('email',$dozent['locations'][0]['location'][0]['email']);
+		//if($user)$veranstaltungen[$k]['dozs'][0]['doz'][$i]['wp_authorurl']=get_author_posts_url($user->ID);
 		}
+	
 
-		//Nach Jahren gruppieren
-		$veranstaltungen = $this->_group_by("type", $veranstaltungen);
+//echo "<pre>";print_r($Dozenten_IDs);echo "</pre>";
+	if(isset($veranstaltung['courses'])){		
+		//Kursdozenten ergänzen:
+			foreach($veranstaltung['courses']['0']['course'] as $coursei=>$course){
+						foreach($course['dozs'][0]['doz'] as $j =>$dozent){
+								if(is_numeric($dozent['id'])){$Dozenten_IDs[$veranstaltung['@attributes']['key']][]=$dozent['id'];}
+						}
+			}
 
-		return array( "veranstaltungen" => $veranstaltungen, "optionen" => $this->optionen);
+		$DelCoursesOfLectures[]=$veranstaltung['name'];
+		}else
+		{
+			if(in_array($person_id,$Dozenten_IDs[$veranstaltung['@attributes']['key']]))
+				{
+					$SaveMyCourses[]=$veranstaltung['@attributes']['key'];
+				}
+		}
+	}
+
+			foreach($veranstaltungen as $i =>$veranstaltung){//doppelte loeschen 2 durchgänge nötig, hauptkurs kommt nicht immer zuerst!
+
+					if(!empty($person_id) && !empty($Dozenten_IDs[$veranstaltung['@attributes']['key']]) &&!in_array($person_id,$Dozenten_IDs[$veranstaltung['@attributes']['key']]))
+							{//Kurse, wo nicht Dozent-> löschen
+						//echo "nicht dozent, loesche ".$veranstaltung['@attributes']['key'];
+								unset($veranstaltungen[$i]);
+								continue;
+							}
+
+						if(in_array($veranstaltung['name'],$DelCoursesOfLectures)&& !isset($veranstaltung['courses']))
+						{//Nur übersichtskurse anzeigen
+						//echo "nicht überischtskurs, loesche ".$veranstaltung['@attributes']['key'];
+							unset($veranstaltungen[$i]);
+							continue;
+						}
+						//echo "<pre>";print_r($veranstaltung['dozs'][0]['doz'][0]);	echo "</pre>";
+						
+								$veranstaltungen[$i] = $this->_bearbeiteLehrveranstaltungenEinzeln($veranstaltung);
+				
+			}
+if(count($veranstaltungen)==0){return false;}
+
+			//Nach type ordnen
+			$veranstaltungen = $this->_group_by("type", $veranstaltungen);
+
+	return array( "veranstaltungen" => $veranstaltungen);
 	}
 
 	private function _bearbeiteLehrveranstaltungenKalender($veranstaltungen) {
@@ -432,7 +699,6 @@ class univisRender {
 
 		foreach ($veranstaltungen as $veranstaltung) {
 			$veranstaltung = $this->_bearbeiteLehrveranstaltungenEinzeln($veranstaltung);
-			$veranstaltung = $veranstaltung["veranstaltung"];
 
 			$titel = $veranstaltung["name"];
 			$beschreibung = $veranstaltung["summary"];
@@ -489,13 +755,15 @@ class univisRender {
 	private function _bearbeiteLehrveranstaltungenEinzeln($veranstaltung) {
 
 
-		$this->_rename_key("type", $veranstaltung, univisDicts::$lecturetypen);
+		//$this->_rename_key("type", $veranstaltung, univisDicts::$lecturetypen);//Use always short
+		$this->_rename_key("type", $veranstaltung, univisDicts::$lecturetypen_short);
 
 		// Dozs
 		for ($i = 0; $i<count($veranstaltung["dozs"]); $i++) {
 			for ($k = 0; $k < count($veranstaltung["dozs"][$i]["doz"]); $k++) {
-
-				$veranstaltung["dozs"][$i]["doz"][$k]["firstname_small"] = strtolower($this->umlaute_ersetzen($veranstaltung["dozs"][$i]["doz"][$k]["firstname"]));
+				if(isset($veranstaltung["dozs"][$i]["doz"][$k]["firstname"]))
+				  $veranstaltung["dozs"][$i]["doz"][$k]["firstname_small"] = strtolower($this->umlaute_ersetzen($veranstaltung["dozs"][$i]["doz"][$k]["firstname"]));
+				if(isset($veranstaltung["dozs"][$i]["doz"][$k]["lastname"]))			  
 				$veranstaltung["dozs"][$i]["doz"][$k]["lastname_small"] = strtolower($this->umlaute_ersetzen($veranstaltung["dozs"][$i]["doz"][$k]["lastname"]));
 			}
 		}
@@ -505,67 +773,70 @@ class univisRender {
 		$angaben = array();
 
 		//Typ
-		if($veranstaltung["type"]) {
+		if(isset($veranstaltung["type"])) {
 			$type = $this->_str_replace_dict(univisDicts::$lecturetypen_short, $veranstaltung["type"]);
 			array_push($angaben, $type);
 		}
 
 		//Schein
-		if($veranstaltung["schein"] && $veranstaltung["schein"] == "ja") {
-			array_push($angaben, "Schein");
+		if(isset($veranstaltung["schein"]) && $veranstaltung["schein"] == "ja") {
+			array_push($angaben, "[:de]Schein[:en][:]");
 		}
 
 		//SWS
-		if ($veranstaltung["sws"]) {
+		if (isset($veranstaltung["sws"])) {
 			array_push($angaben, $veranstaltung["sws"]." SWS");
 		}
 
 		//ECTS
-		if($veranstaltung["ects"] && $veranstaltung["ects"] == "ja") {
-			array_push($angaben, "ECTS-Studium");
+		if(isset($veranstaltung["ects"])&& $veranstaltung["ects"] == "ja") {
+		//	array_push($angaben, "ECTS-Studium");
 		}
 
-		if($veranstaltung["ects_cred"]) {
-			array_push($angaben, "ECTS-Credits: ".$veranstaltung["ects_cred"]);
+		if(isset($veranstaltung["ects_cred"])) {
+			array_push($angaben, $veranstaltung["ects_cred"]." ECTS-Credits");
 		}
 
 		//Anfänger
-		if($veranstaltung["beginners"] && $veranstaltung["beginners"] == "ja") {
-			array_push($angaben, "für Anfänger geeignet");
+		if(isset($veranstaltung["beginners"]) && $veranstaltung["beginners"] == "ja") {
+			array_push($angaben, "[:de]für Anfänger geeignet[:en]for beginners[:]");
 		}
 
 		//Gasthörer
-		if($veranstaltung["gast"] && $veranstaltung["gast"] == "ja") {
-			array_push($angaben, "für Gasthörer zugelassen");
+		if(isset($veranstaltung["gast"])&& $veranstaltung["gast"] == "ja") {
+			array_push($angaben, "[:de]für Gasthörer zugelassen[:en]Guest students allowed[:]");
 		}
 
 		//Evaluation
-		if($veranstaltung["evaluation"] && $veranstaltung["evaluation"] == "ja") {
+		if(isset($veranstaltung["evaluation"])&& $veranstaltung["evaluation"] == "ja") {
 			array_push($angaben, "Evaluation");
 		}
 
 		//Unterrrichtssprache
-		if ($veranstaltung["leclanguage"]) {
+		if (isset($veranstaltung["leclanguage"])) {
 			$formated = $this->_str_replace_dict(univisDicts::$leclanguages, $veranstaltung["leclanguage"]);
-			array_push($angaben, "Unterrichtssprache ".$formated);
+			array_push($angaben, "[:de]Unterrichtssprache[:en]Presentation language[:] ".$formated);
 		}
 
 		//Comment
-		if($veranstaltung["comment"]) {
-			array_push($angaben, $veranstaltung["comment"]);
+		if(isset($veranstaltung["comment"])) {
+		$tmp=str_replace('Mündliche Prüfung','[:de]Mündliche Prüfung[:en]Oral exam[:]',$veranstaltung["comment"]);
+			array_push($angaben, $tmp);
 		}
-
-		$veranstaltung["angaben"] = implode(", ", $angaben);
+    if(isset($angaben)){$veranstaltung["angaben"] = implode(", ", $angaben);}
 
 		//Begin Zeit und Ort
+		if(isset($veranstaltung["terms"])&&is_array($veranstaltung["terms"])){
 		for ($_terms=0; $_terms < count($veranstaltung["terms"]); $_terms++) {
 			for ($_term=0; $_term < count($veranstaltung["terms"][$_terms]["term"]); $_term++) {
 				$lecture = &$veranstaltung["terms"][$_terms]["term"][$_term];
 
 				$date = array();
-
+				
+      if(isset($lecture["repeat"])){
 				$repeat = explode(" ", $lecture["repeat"]);
-				if($repeat) {
+				}
+				if(isset($repeat)) {
 					$dict = array(
 						"w1" => "",
 						"w2" => "Alle zwei Wochen",
@@ -603,7 +874,87 @@ class univisRender {
 							7 => "Sonntag"
 						);
 
-						array_push($date, $days_short[$repeat[1]]);
+						if(isset($repeat[1])&&isset($days_short[$repeat[1]])){array_push($date, $days_short[$repeat[1]]);}
+
+					}
+				}
+
+				$lecture["date"] = implode(" ", $date);
+
+				$lecture["room_short"] = $lecture["room"][0]["short"];
+
+				if(isset($lecture["exclude"])) {
+					$dates = explode(",", $lecture["exclude"]);
+
+					for ($i=0; $i < count($dates); $i++) {
+						if($dates[$i]=="vac")
+							unset($dates[$i]);
+						else
+							$dates[$i] = date("d.m.Y", strtotime($dates[$i]));
+					}
+
+					$lecture["exclude"] = implode(", ", $dates);
+				}
+			}
+		}}//end Zeit und Ort
+		
+		//Schleife über courses
+		if(isset($veranstaltung['courses'])&&is_array($veranstaltung['courses']['0']['course'])){
+		foreach($veranstaltung['courses']['0']['course']  as $idx=>$course)
+		{
+		//echo "<br>".$course['name'];
+		
+		//Begin Zeit und Ort fuer Courses
+		if(isset($course["terms"])){
+		for ($_terms=0; $_terms < count($course["terms"]); $_terms++) {
+			for ($_term=0; $_term < count($course["terms"][$_terms]["term"]); $_term++) {
+				$lecture = &$veranstaltung['courses']['0']['course'][$idx]["terms"][$_terms]["term"][$_term];
+
+				$date = array();
+
+        if(isset($lecture["repeat"]))
+        {$repeat = explode(" ", $lecture["repeat"]);}
+
+				if(isset($repeat)) {
+					$dict = array(
+						"w1" => "",
+						"w2" => "Alle zwei Wochen",
+						"w2" => "Alle drei Wochen",
+						"w2" => "Alle vier Wochen",
+						"s1" => "Einzeltermin am"
+					);
+
+					if(array_key_exists($repeat[0], $dict))
+						array_push($date, $dict[$repeat[0]]);
+
+					if($repeat[0] == "s1") {
+						$formated = date("d.m.Y", strtotime($lecture["startdate"]));
+						array_push($date, $formated);
+					}
+
+					if(count($repeat)>0) {
+						$days_short = array(
+							1 => "Mo",
+							2 => "Di",
+							3 => "Mi",
+							4 => "Do",
+							5 => "Fr",
+							6 => "Sa",
+							7 => "So"
+						);
+
+						$days_long = array(
+							1 => "Montag",
+							2 => "Dienstag",
+							3 => "Mittwoch",
+							4 => "Donnerstag",
+							5 => "Freitag",
+							6 => "Samstag",
+							7 => "Sonntag"
+						);
+            if(isset($repeat[1])){
+						  array_push($date, $days_short[$repeat[1]]);
+						}
 
 					}
 				}
@@ -625,37 +976,42 @@ class univisRender {
 					$lecture["exclude"] = implode(", ", $dates);
 				}
 			}
-		}//end Zeit und Ort
+		}//end Zeit und Ort fuer Courses
+				
+		}}}//Ende Schleife über Courses
 
 
 		//Summary
-		$veranstaltung["summary"] = str_replace("\n", "<br/>", $veranstaltung["summary"]);
+		if(isset($veranstaltung["summary"])){$veranstaltung["summary"] = str_replace("\n", "<br/>", $veranstaltung["summary"]);}
 
 		//Organizational
-		$veranstaltung["organizational"] = str_replace("\n", "<br/>", $veranstaltung["organizational"]);
+		if(isset($veranstaltung["organizational"])){		$veranstaltung["organizational"] = str_replace("\n", "<br/>", $veranstaltung["organizational"]);}
 
 		//ECTS Summary
-		$veranstaltung["ects_summary"] = str_replace("\n", "<br/>", $veranstaltung["ects_summary"]);
+		if(isset($veranstaltung["ects_summary"])){		$veranstaltung["ects_summary"] = str_replace("\n", "<br/>", $veranstaltung["ects_summary"]);}
 
-		$veranstaltung["ects_infos"] = ($veranstaltung["ects_name"] || $veranstaltung["ects_summary"] || $veranstaltung["ects_literature"]);
-		$veranstaltung["zusatzinfos"] = ($veranstaltung["keywords"] || $veranstaltung["turnout"] || $veranstaltung["url_description"]);
+		$veranstaltung["ects_infos"] = (isset($veranstaltung["ects_name"]) || isset($veranstaltung["ects_summary"]) || isset($veranstaltung["ects_literature"]));
+		$veranstaltung["zusatzinfos"] = (isset($veranstaltung["keywords"]) || isset($veranstaltung["turnout"]) || isset($veranstaltung["url_description"]));
 
 
-		return array( "veranstaltung" => $veranstaltung, "optionen" => $this->optionen);
+		return $veranstaltung;
 	}
 
 	private function _str_replace_dict($dict, $str) {
+    if(is_array($str)) return $str;
 		foreach ($dict as $key => $value) {
-			$str = str_replace($key, $value, $str);
-		}
+		  if ($key===$str){return $value;}
+    }
 		return $str;
 	}
 
 	private function _rename_key($search_key, &$arr, $dict) {
 		foreach ($arr as &$veranstaltung) {
-			foreach ($veranstaltung as $key => &$value) {
-				if($key == $search_key) {
-					$value = $this->_str_replace_dict($dict, $value);
+			if(is_array($veranstaltung)){
+				foreach ($veranstaltung as $key => &$value) {
+					if($key == $search_key) {
+						$value = $this->_str_replace_dict($dict, $value);
+					}
 				}
 			}
 		}
@@ -670,9 +1026,12 @@ class univisRender {
 
 			$gruppenName = $child[$key_name];
 
-			if($gruppen_dict[$gruppenName]==NULL)
-				$gruppen_dict[$gruppenName] = array();
+			if(!isset($gruppen_dict[$gruppenName])||($gruppen_dict[$gruppenName]==NULL))
+			{	$gruppen_dict[$gruppenName] = array();}
+			
+			
 			array_push($gruppen_dict[$gruppenName], $child);
+			
 		}
 
 		foreach ($gruppen_dict as $gruppen_name => $gruppen_data) {
@@ -680,7 +1039,6 @@ class univisRender {
 				"title" => $gruppen_name,
 				"data" => $gruppen_data
 			);
-
 			array_push($gruppen, $gruppen_obj);
 		}
 
@@ -738,6 +1096,73 @@ class univisRender {
 		return array_pop($args);
 	}
 
+
+   private function person_format_convert($person){
+   
+		if(isset($person["atitle"])&& !isset($person["title"]))
+		{
+		  $person["title"]=$person["atitle"];
+		  $person["atitle"]="";
+		}
+   if(isset($person['locations'])&&isset($person['locations']['0']['location']['0']['email']))
+   $current_email=$person['locations']['0']['location']['0']['email'];
+
+    if(isset($current_email))
+    {
+    $correspondingUser=get_user_by('email',$current_email);
+    }else 
+    {
+    $correspondingUser=false;
+    }
+
+   
+   
+   
+    switch($this->optionen['task']){
+      case 'mitarbeiter-einzeln':
+        $picwidth=150;
+        $picheight=200;
+        $UserID=$this->optionen['wpuserid'];
+        break;
+      default:
+        if($correspondingUser)$UserID=$correspondingUser->ID;
+        $picwidth=64;
+        $picheight=85;
+   }      
+   //Set url to author-page
+    if(!empty($UserID))
+	    {
+		    $person['wp_authorurl']=get_author_posts_url($correspondingUser->ID);
+	    }
+   
+   
+      if(function_exists('get_avatar')&&isset($UserID))
+			 {
+	      $imageTag=get_avatar($UserID,'','NOLINK','',array('width'=>$picwidth,'height'=>$picheight));
+        if(preg_match('%<img.*?src=["\'](.*?)["\'].*?/>%i', $imageTag , $result))
+        $person["pictureurl"]=$result[1];
+       }
+   
+   
+			//		print("<pre>");print_r($person);print("</pre>");
+			if(isset($person['locations'])&&is_array($person['locations'])){
+			foreach($person['locations'][0]['location'] as $key=>$value){
+						$search_pattern=array(' ','09131/85','0911/56854','--','(');
+						$replace_pattern=array('','09131/85-','0911/56854-','-',' (');
+
+						if(!empty($value['tel'])){
+							$tel = str_replace($search_pattern,$replace_pattern,$value['tel']);
+							$person['locations'][0]['location'][$key]['tel']=$tel;
+							}
+
+						if(!empty($value['fax'])){
+							$fax = str_replace($search_pattern,$replace_pattern,$value['fax']);
+							$person['locations'][0]['location'][$key]['fax']=$fax;
+							}
+						}
+			}
+		return $person;
+	}
 
 }
 

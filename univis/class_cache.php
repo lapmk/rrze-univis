@@ -25,7 +25,8 @@ class univisCache {
 	 */
 	function __construct($optionen) {
             //self::$path = plugins_url( "cache_dir", __FILE__);
-            self::$path = dirname( plugin_basename( __FILE__ ) )."/cache_dir";
+           // self::$path = dirname( plugin_basename( __FILE__ ) )."/cache_dir";
+		self::$path = plugin_dir_path( __FILE__ )."cache_dir";
 		$this->optionen = $optionen;
 		
 	}
@@ -36,25 +37,25 @@ class univisCache {
 		
 		if($sucheDateiErgebnis > 0) {
 			// Datei ist vorhanden und gueltig
+			echo "<!-- Univis Datensatz vom ".date("d.m.y H:i:s",filemtime($this->filepath()))." -->\n";
 			return file_get_contents($this->filepath());
 		}
 
 		if($sucheDateiErgebnis == 0 && $force) {
 			// Datei nicht gueltig, aber:
 			// Ausgabe durch Parameter forciert.
+			echo "<!-- Univis Datensatz vom ".date("d.m.y H:i:s",filemtime($this->filepath()))." (force=true) -->\n";
 			return file_get_contents($this->filepath());
-		
 		}
-
+			echo "<!-- Univis Datensatz aktuell -->";
 		return -1;
 	}
 
 	public function setzeDaten($data) {
-		
-		$filepath = $this->filepath();
-                if(file_exists($filepath)) {
-                    file_put_contents($filepath, $data);
-                }
+				$filepath = $this->filepath();
+        	if(is_dir(self::$path)) {
+			file_put_contents($filepath, $data);
+       		}
 	}
 
 	private function sucheDatei() {
@@ -80,8 +81,13 @@ class univisCache {
 
 	private function filepath() {
 		// Key md5 codieren
-		$key = md5($this->key());
-		return self::$path."/".$key;
+		$key=$this->key();
+		if($key===-1)
+		{
+			return -1;
+		}else{
+			return self::$path."/".md5($key);
+		}
 	}
 
 	private function key() {
@@ -94,12 +100,14 @@ class univisCache {
 			// Fehler in Konifguration
 			return -1; 
 		}
-		
 		switch ($optionen["task"]) {
 			case 'mitarbeiter-alle':				return $optionen["task"]."/".$optionen["UnivISOrgNr"];
 			case 'mitarbeiter-einzeln':				return $optionen["task"]."/".$optionen["lastname"]."-".$optionen["firstname"];
-			case 'lehrveranstaltungen-alle':		return $optionen["task"]."/".$optionen["UnivISOrgNr"];
-			case 'lehrveranstaltungen-einzeln':		return $optionen["task"]."/".$optionen["id"];
+			case 'mitarbeiter-lehre':
+										if(empty($optionen["univis_id"])){return -1;}
+										return $optionen["task"]."/".$optionen["semester"]."/".$optionen["univis_id"];
+			case 'lehrveranstaltungen-alle':		return $optionen["task"]."/".$optionen["UnivISOrgNr"]."/".$optionen["semester"];
+			case 'lehrveranstaltungen-einzeln':		return $optionen["task"]."/".$optionen["semester"]."/".$optionen["id"];
 			case 'publikationen':					return $optionen["task"]."/".$optionen["UnivISOrgNr"];
 				
 			default:								return -1;
